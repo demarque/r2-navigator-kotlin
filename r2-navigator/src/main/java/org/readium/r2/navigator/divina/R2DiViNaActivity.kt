@@ -10,6 +10,7 @@
 package org.readium.r2.navigator.divina
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
@@ -20,16 +21,14 @@ import androidx.webkit.WebViewClientCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.readium.r2.navigator.IR2Activity
-import org.readium.r2.navigator.R
-import org.readium.r2.navigator.R2BasicWebView
+import org.readium.r2.navigator.*
 import org.readium.r2.shared.extensions.destroyPublication
 import org.readium.r2.shared.extensions.getPublication
 import org.readium.r2.shared.publication.Publication
 import kotlin.coroutines.CoroutineContext
 
 
-open class R2DiViNaActivity : AppCompatActivity(), CoroutineScope, IR2Activity {
+open class R2DiViNaActivity : AppCompatActivity(), CoroutineScope, IR2Activity, VisualNavigator.Listener {
 
     /**
      * Context of this scope.
@@ -53,8 +52,7 @@ open class R2DiViNaActivity : AppCompatActivity(), CoroutineScope, IR2Activity {
 
         preferences = getSharedPreferences("org.readium.r2.settings", Context.MODE_PRIVATE)
         divinaWebView = findViewById(R.id.divinaWebView)
-        divinaWebView.activity = this
-        divinaWebView.listener = this
+        //divinaWebView.listener = this
 
         publication = intent.getPublication(this)
         publicationPath = intent.getStringExtra("publicationPath") ?: throw Exception("publicationPath required")
@@ -101,10 +99,14 @@ open class R2DiViNaActivity : AppCompatActivity(), CoroutineScope, IR2Activity {
         }
     }
 
+    override fun finish() {
+        setResult(Activity.RESULT_OK, intent)
+        super.finish()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         divinaWebView.evaluateJavascript("if (player) { player.destroy(); };", null)
-        intent.destroyPublication(this)
     }
 }
 

@@ -20,6 +20,7 @@ import org.readium.r2.navigator.IR2Activity
 import org.readium.r2.navigator.NavigatorDelegate
 import org.readium.r2.navigator.R
 import org.readium.r2.navigator.VisualNavigator
+import org.readium.r2.navigator.extensions.withLocalUrl
 import org.readium.r2.shared.extensions.destroyPublication
 import org.readium.r2.shared.extensions.getPublication
 import org.readium.r2.shared.publication.*
@@ -96,14 +97,6 @@ open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activit
     override val readingProgression: ReadingProgression
         get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
 
-    override fun goLeft(animated: Boolean, completion: () -> Unit): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    override fun goRight(animated: Boolean, completion: () -> Unit): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
     /**
      * Context of this scope.
      */
@@ -147,7 +140,9 @@ open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activit
             
         if (this.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
 
-            mediaPlayer = R2MediaPlayer(publication.readingOrder, this)
+            val port = preferences.getString("$publicationIdentifier-publicationPort", 0.toString())!!.toInt()
+            val readingOrderOverHttp = publication.readingOrder.map { it.withLocalUrl(publicationFileName, port) }
+            mediaPlayer = R2MediaPlayer(readingOrderOverHttp, this)
 
             mediaPlayer?.goTo(currentResource)
 
@@ -355,6 +350,11 @@ open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activit
         }
     }
 
+    override fun finish() {
+        setResult(Activity.RESULT_OK, intent)
+        super.finish()
+    }
+
     override fun onResume() {
         super.onResume()
         mediaPlayer?.resume()
@@ -373,31 +373,32 @@ open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activit
     override fun onDestroy() {
         super.onDestroy()
         mediaPlayer?.stop()
-        intent.destroyPublication(this)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 2 && resultCode == Activity.RESULT_OK) {
             if (data != null) {
-                val locator = data.getParcelableExtra("locator") as Locator
+                val locator = data.getParcelableExtra("locator") as? Locator
 
-                // href is the link to the page in the toc
-                var href = locator.href
+                locator?.let {
+                    // href is the link to the page in the toc
+                    var href = locator.href
 
-                if (href.indexOf("#") > 0) {
-                    href = href.substring(0, href.indexOf("#"))
-                }
-
-                var index = 0
-                for (resource in publication.readingOrder) {
-                    if (resource.href.endsWith(href)) {
-                        currentResource = index
-                        break
+                    if (href.indexOf("#") > 0) {
+                        href = href.substring(0, href.indexOf("#"))
                     }
-                    index++
+
+                    var index = 0
+                    for (resource in publication.readingOrder) {
+                        if (resource.href.endsWith(href)) {
+                            currentResource = index
+                            break
+                        }
+                        index++
+                    }
+                    seekLocation = locator.locations
                 }
-                seekLocation = locator.locations
 
                 isSeekNeeded = true
 

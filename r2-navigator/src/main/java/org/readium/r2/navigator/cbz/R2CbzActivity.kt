@@ -16,76 +16,63 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentFactory
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
 import androidx.viewpager.widget.ViewPager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.readium.r2.navigator.IR2Activity
-import org.readium.r2.navigator.NavigatorDelegate
-import org.readium.r2.navigator.R
-import org.readium.r2.navigator.VisualNavigator
+import org.readium.r2.navigator.*
+import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.extensions.layoutDirectionIsRTL
+import org.readium.r2.navigator.pager.R2CbzPageFragment
 import org.readium.r2.navigator.pager.R2PagerAdapter
 import org.readium.r2.navigator.pager.R2ViewPager
+import org.readium.r2.shared.FragmentNavigator
 import org.readium.r2.shared.extensions.destroyPublication
 import org.readium.r2.shared.extensions.getPublication
 import org.readium.r2.shared.publication.*
 import org.readium.r2.shared.publication.services.positions
 import kotlin.coroutines.CoroutineContext
 
+@OptIn(FragmentNavigator::class)
+open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, VisualNavigator, VisualNavigator.Listener {
 
-open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, VisualNavigator {
+    private val navigatorFragment: ImageNavigatorFragment
+        get() = supportFragmentManager.findFragmentById(R.id.image_navigator) as ImageNavigatorFragment
 
-    override val currentLocator: LiveData<Locator?> get() = _currentLocator
-    private val _currentLocator = MutableLiveData<Locator?>(null)
 
-    private fun notifyCurrentLocation() {
-        val locator = positions[resourcePager.currentItem]
-        if (locator == currentLocator.value) {
-            return
-        }
+    protected var navigatorDelegate: NavigatorDelegate? = null
 
-        _currentLocator.postValue(locator)
-        navigatorDelegate?.locationDidChange(navigator = this, locator = locator)
-    }
+    protected val positions: List<Locator> get() = navigatorFragment.positions
+    val currentPagerPosition: Int get() = navigatorFragment.currentPagerPosition
 
-    override val currentLocation: Locator?
-        get() = currentLocator.value
+    override val currentLocator: LiveData<Locator?>
+        get() = navigatorFragment.currentLocator
 
     override fun go(locator: Locator, animated: Boolean, completion: () -> Unit): Boolean {
-        val resourceIndex = publication.readingOrder.indexOfFirstWithHref(locator.href)
-            ?: return false
-
-        currentPagerPosition = resourceIndex
-        resourcePager.currentItem = currentPagerPosition
-        return true
+        return navigatorFragment.go(locator, animated, completion)
     }
 
     override fun go(link: Link, animated: Boolean, completion: () -> Unit): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return navigatorFragment.go(link, animated, completion)
     }
 
     override fun goForward(animated: Boolean, completion: () -> Unit): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return navigatorFragment.goForward(animated, completion)
     }
 
     override fun goBackward(animated: Boolean, completion: () -> Unit): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return navigatorFragment.goBackward(animated, completion)
     }
 
     override val readingProgression: ReadingProgression
-        get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
+        get() = navigatorFragment.readingProgression
 
-    override fun goLeft(animated: Boolean, completion: () -> Unit): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    override fun goRight(animated: Boolean, completion: () -> Unit): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
 
     /**
      * Context of this scope.
@@ -99,99 +86,50 @@ open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, Vis
     override lateinit var publication: Publication
     override lateinit var publicationIdentifier: String
     override lateinit var publicationFileName: String
-    protected lateinit var positions: List<Locator>
+
     override var bookId: Long = -1
 
     var resources: List<String> = emptyList()
     lateinit var adapter: R2PagerAdapter
 
-    var currentPagerPosition: Int = 0
-    protected var navigatorDelegate: NavigatorDelegate? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_r2_viewpager)
-
         preferences = getSharedPreferences("org.readium.r2.settings", Context.MODE_PRIVATE)
-        resourcePager = findViewById(R.id.resourcePager)
-        resourcePager.type = Publication.TYPE.CBZ
 
         publicationPath = intent.getStringExtra("publicationPath") ?: throw Exception("publicationPath required")
         publicationFileName = intent.getStringExtra("publicationFileName") ?: throw Exception("publicationFileName required")
         publication = intent.getPublication(this)
-        positions = runBlocking { publication.positions() }
 
         publicationIdentifier = publication.metadata.identifier!!
         title = publication.metadata.title
 
-        resources = publication.readingOrder.map { it.href }
+        val initialLocator = intent.getParcelableExtra("locator") as? Locator
 
+        supportFragmentManager.fragmentFactory = NavigatorFragmentFactory(publication, initialLocator = initialLocator, listener = this)
 
-        resourcePager.addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
+        super.onCreate(savedInstanceState)
 
-            override fun onPageSelected(position: Int) {
-                notifyCurrentLocation()
-            }
+        setContentView(R.layout.activity_r2_image)
 
+        resourcePager = navigatorFragment.resourcePager
+
+        navigatorFragment.currentLocator.observe(this, Observer { locator ->
+            locator ?: return@Observer
+            @Suppress("DEPRECATION")
+            navigatorDelegate?.locationDidChange(this, locator)
         })
-
-        adapter = R2PagerAdapter(supportFragmentManager, resources, publication.metadata.title, Publication.TYPE.CBZ, publicationPath)
-
-        resourcePager.adapter = adapter
-
-        if (currentPagerPosition == 0) {
-            if (layoutDirectionIsRTL()) {
-                // The view has RTL layout
-                resourcePager.currentItem = resources.size - 1
-            } else {
-                // The view has LTR layout
-                resourcePager.currentItem = currentPagerPosition
-            }
-        } else {
-            resourcePager.currentItem = currentPagerPosition
-        }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-
-        intent.destroyPublication(this)
-    }
-
-    override fun onStart() {
-        super.onStart()
-
-        // OnPageChangeListener.onPageSelected is not called on the first page of the book, so we
-        // trigger the locationDidChange event manually.
-        notifyCurrentLocation()
+    override fun finish() {
+        setResult(Activity.RESULT_OK, intent)
+        super.finish()
     }
 
     override fun nextResource(v: View?) {
-        launch {
-            if (layoutDirectionIsRTL()) {
-                // The view has RTL layout
-                resourcePager.currentItem = resourcePager.currentItem - 1
-            } else {
-                // The view has LTR layout
-                resourcePager.currentItem = resourcePager.currentItem + 1
-            }
-
-            notifyCurrentLocation()
-        }
+        navigatorFragment.nextResource(v)
     }
 
     override fun previousResource(v: View?) {
-        launch {
-            if (layoutDirectionIsRTL()) {
-                // The view has RTL layout
-                resourcePager.currentItem = resourcePager.currentItem + 1
-            } else {
-                // The view has LTR layout
-                resourcePager.currentItem = resourcePager.currentItem - 1
-            }
-
-            notifyCurrentLocation()
-        }
+        navigatorFragment.previousResource(v)
     }
 
     override fun toggleActionBar() {
@@ -221,21 +159,23 @@ open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, Vis
         if (requestCode == 2 && resultCode == Activity.RESULT_OK) {
             if (data != null) {
 
-                val locator = data.getParcelableExtra("locator") as Locator
+                val locator = data.getParcelableExtra("locator") as? Locator
 
-                fun setCurrent(resources: List<String>) {
-                    for (index in 0 until resources.count()) {
-                        val resource = resources[index]
-                        if (resource.endsWith(locator.href)) {
-                            resourcePager.currentItem = index
-                            break
+                locator?.let {
+                    fun setCurrent(resources: List<String>) {
+                        for (index in 0 until resources.count()) {
+                            val resource = resources[index]
+                            if (resource.endsWith(locator.href)) {
+                                resourcePager.currentItem = index
+                                break
+                            }
                         }
                     }
+
+                    go(locator)
+
+                    setCurrent(resources)
                 }
-
-                resourcePager.adapter = adapter
-
-                setCurrent(resources)
 
                 if (supportActionBar!!.isShowing && allowToggleActionBar) {
                     resourcePager.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -249,5 +189,4 @@ open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, Vis
         }
         super.onActivityResult(requestCode, resultCode, data)
     }
-
 }
