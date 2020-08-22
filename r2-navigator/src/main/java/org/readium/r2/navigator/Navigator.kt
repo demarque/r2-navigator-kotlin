@@ -11,6 +11,8 @@ import androidx.lifecycle.LiveData
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.ReadingProgression
+import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 
 /**
  * Base interface for a navigator rendering a publication.
@@ -138,7 +140,22 @@ interface VisualNavigator : Navigator {
 /**
  * A navigator rendering an audio or video publication.
  */
+@OptIn(ExperimentalTime::class)
 interface MediaNavigator : Navigator {
+
+    /**
+     * @param position Playback position in the current resource.
+     * @param duration Duration of the current resource.
+     */
+    data class PlaybackInfo(
+        val position: Duration,
+        val duration: Duration?
+    )
+
+    /**
+     * Current playback information.
+     */
+    val playbackInfo: LiveData<PlaybackInfo>
 
     /**
      * Resumes or start the playback at the current location.
@@ -155,5 +172,10 @@ interface MediaNavigator : Navigator {
      * Can be useful as a handler for play/pause button.
      */
     fun playPause()
+
+    /**
+     * Seeks to the given time in the current resource.
+     */
+    fun seekTo(position: Duration)
 
 }
