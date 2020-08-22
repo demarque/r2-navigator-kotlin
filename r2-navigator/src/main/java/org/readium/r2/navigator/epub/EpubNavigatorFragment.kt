@@ -39,7 +39,7 @@ import kotlin.math.ceil
 
 @FragmentNavigator
 class EpubNavigatorFragment(
-    internal val publication: Publication,
+    override val publication: Publication,
     private val baseUrl: String,
     private val initialLocator: Locator? = null,
     internal val listener: Navigator.Listener? = null

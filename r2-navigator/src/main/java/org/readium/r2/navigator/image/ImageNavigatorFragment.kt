@@ -30,7 +30,7 @@ import org.readium.r2.shared.publication.services.positions
 
 @FragmentNavigator
 class ImageNavigatorFragment(
-    internal val publication: Publication,
+    override val publication: Publication,
     private val initialLocator: Locator? = null,
     internal val listener: Navigator.Listener? = null
 ) : Fragment(), CoroutineScope by MainScope(), VisualNavigator {

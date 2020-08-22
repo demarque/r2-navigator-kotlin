@@ -10,6 +10,7 @@ import android.graphics.PointF
 import androidx.lifecycle.LiveData
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.ReadingProgression
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -35,6 +36,11 @@ import kotlin.time.ExperimentalTime
  *   implemented by the reading app, and not the navigator.
  */
 interface Navigator {
+
+    /**
+     * Publication rendered by this navigator.
+     */
+    val publication: Publication
 
     /**
      * Current location in the publication.
