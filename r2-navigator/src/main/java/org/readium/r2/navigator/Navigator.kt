@@ -188,6 +188,6 @@ interface MediaNavigator : Navigator {
     /**
      * Seeks relatively from the current position in the current resource.
      */
-    fun seekBy(interval: Duration)
+    fun seekRelative(offset: Duration)
 
 }
