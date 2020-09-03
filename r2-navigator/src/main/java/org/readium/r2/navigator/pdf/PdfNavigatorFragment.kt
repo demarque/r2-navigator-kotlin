@@ -41,7 +41,7 @@ import java.net.URL
 
 @PdfSupport @FragmentNavigator
 class PdfNavigatorFragment(
-    private val publication: Publication,
+    override val publication: Publication,
     private val baseUrl: String,
     private val initialLocator: Locator? = null,
     private val listener: Navigator.Listener? = null

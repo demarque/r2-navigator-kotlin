@@ -4,7 +4,7 @@
  * available in the top-level LICENSE file of the project.
  */
 
-package org.readium.r2.navigator.cbz
+package org.readium.r2.navigator.image
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -30,7 +30,7 @@ import org.readium.r2.shared.publication.services.positions
 
 @FragmentNavigator
 class ImageNavigatorFragment(
-    internal val publication: Publication,
+    override val publication: Publication,
     private val initialLocator: Locator? = null,
     internal val listener: Navigator.Listener? = null
 ) : Fragment(), CoroutineScope by MainScope(), VisualNavigator {
