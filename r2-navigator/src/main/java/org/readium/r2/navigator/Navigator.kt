@@ -157,6 +157,11 @@ interface MediaNavigator : Navigator {
     val playback: Flow<MediaPlayback>
 
     /**
+     * Indicates whether the navigator is currently playing.
+     */
+    val isPlaying: Boolean
+
+    /**
      * Sets the speed of the media playback.
      *
      * Normal speed is 1.0 and 0.0 is incorrect.
