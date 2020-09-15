@@ -20,29 +20,40 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import com.google.android.exoplayer2.*
 import com.google.android.exoplayer2.audio.AudioAttributes
+import com.google.android.exoplayer2.database.ExoDatabaseProvider
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
 import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
-import com.google.android.exoplayer2.source.ConcatenatingMediaSource
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
+import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
+import com.google.android.exoplayer2.upstream.DataSource
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory
+import com.google.android.exoplayer2.upstream.cache.Cache
+import com.google.android.exoplayer2.upstream.cache.CacheDataSource
+import com.google.android.exoplayer2.upstream.cache.NoOpCacheEvictor
+import com.google.android.exoplayer2.upstream.cache.SimpleCache
+import com.google.android.exoplayer2.util.Util
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.R
+import org.readium.r2.navigator.audio.CompositeDataSource
 import org.readium.r2.navigator.audio.PublicationDataSource
 import org.readium.r2.navigator.extensions.timeWithDuration
 import org.readium.r2.shared.AudioSupport
 import org.readium.r2.shared.publication.*
+import java.io.File
+import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
 @AudioSupport
 @OptIn(ExperimentalTime::class)
-internal class ExoMediaPlayer(
+class ExoMediaPlayer(
     context: Context,
     mediaSession: MediaSessionCompat,
-    media: PendingMedia
+    media: PendingMedia,
+    cache: Cache? = null
 ) : MediaPlayer, CoroutineScope by MainScope() {
 
     override var listener: MediaPlayer.Listener? = null
@@ -50,16 +61,38 @@ internal class ExoMediaPlayer(
     private val publication: Publication = media.publication
     private val publicationId: PublicationId = media.publicationId
 
-    private val player: ExoPlayer = SimpleExoPlayer.Builder(context).build().apply {
-        audioAttributes = AudioAttributes.Builder()
-            .setContentType(C.CONTENT_TYPE_MUSIC)
-            .setUsage(C.USAGE_MEDIA)
-            .build()
+    private val dataSourceFactory by lazy {
+        var factory: DataSource.Factory = CompositeDataSource.Factory()
+            .bind(DefaultHttpDataSourceFactory(Util.getUserAgent(context, "Readium"))) {
+                it.scheme?.toLowerCase(Locale.ROOT) in listOf("http", "https")
+            }
+            .bind(PublicationDataSource.Factory(publication))
 
-        setHandleAudioBecomingNoisy(true)
-        addListener(EventListener())
-//        addAnalyticsListener(EventLogger(null))
+        if (cache != null) {
+            factory = CacheDataSource.Factory()
+                .setCache(cache)
+                .setUpstreamDataSourceFactory(factory)
+                // Disable writing to the cache by the player. We'll handle downloads through the
+                // service.
+                .setCacheWriteDataSinkFactory(null)
+        }
+
+        factory
     }
+
+    private val player: ExoPlayer = SimpleExoPlayer.Builder(context)
+        .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+        .build()
+        .apply {
+            audioAttributes = AudioAttributes.Builder()
+                .setContentType(C.CONTENT_TYPE_MUSIC)
+                .setUsage(C.USAGE_MEDIA)
+                .build()
+
+            setHandleAudioBecomingNoisy(true)
+            addListener(EventListener())
+    //        addAnalyticsListener(EventLogger(null))
+        }
 
     // FIXME: ExoPlayer's media session connector doesn't handle the playback speed yet, so I used a custom solution until we create our own connector
     override var playbackRate: Double
@@ -87,8 +120,10 @@ internal class ExoMediaPlayer(
             setUseNavigationActions(false)
             setUseNavigationActionsInCompactView(false)
             setUseChronometer(false)
-            setRewindIncrementMs(30.seconds.toLongMilliseconds())
-            setFastForwardIncrementMs(30.seconds.toLongMilliseconds())
+            setControlDispatcher(DefaultControlDispatcher(
+                30.seconds.toLongMilliseconds(),
+                30.seconds.toLongMilliseconds()
+            ))
         }
 
     private val mediaSessionConnector = MediaSessionConnector(mediaSession)
@@ -113,16 +148,10 @@ internal class ExoMediaPlayer(
     }
 
     private fun prepareTracklist() {
-        val dataSourceFactory = PublicationDataSource.Factory(publication)
-        val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
-
-        val trackSources = publication.readingOrder.map { link ->
-            val uri = Uri.parse(link.href)
-            mediaSourceFactory.createMediaSource(uri)
-        }
-        val tracklistSource = ConcatenatingMediaSource(*trackSources.toTypedArray())
-
-        player.prepare(tracklistSource)
+        player.setMediaItems(publication.readingOrder.map { link ->
+            MediaItem.fromUri(link.href)
+        })
+        player.prepare()
     }
 
     private fun seekTo(locator: Locator) {
@@ -222,6 +251,21 @@ internal class ExoMediaPlayer(
         putString(MediaMetadataCompat.METADATA_KEY_AUTHOR, publication.metadata.authors.joinToString(", ") { it.name }.takeIf { it.isNotBlank() })
         putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, publication.metadata.title)
     }.build()
+
+    companion object {
+
+        private var cache: Cache? = null
+
+        private fun getCache(context: Context): Cache =
+            createIfNull(::cache, this) {
+                SimpleCache(
+                    /* cacheDir */ File(context.externalCacheDir, "exoplayer"),
+                    NoOpCacheEvictor(),
+                    ExoDatabaseProvider(context)
+                )
+            }
+
+    }
 
 }
 
