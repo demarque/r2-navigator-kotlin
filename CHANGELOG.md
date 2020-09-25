@@ -10,10 +10,16 @@ All notable changes to this project will be documented in this file.
 
 * (*Experimental*) New `Fragment` implementations as an alternative to the legacy `Activity` ones (contributed by [@johanpoirier](https://github.com/readium/r2-navigator-kotlin/pull/148)).
   * The fragments are chromeless, to let you customize the reading UX.
-  * Use the new `NavigatorFragmentFactory` to help build the fragments, as showcased in `R2PdfActivity`.
+  * To create the fragments use the matching factory such as `EpubNavigatorFragment.Factory`, as showcased in `R2EpubActivity`.
   * At the moment, highlights and TTS are not yet supported in the new EPUB navigator `Fragment`.
   * [This is now the recommended way to integrate Readium](https://github.com/readium/r2-navigator-kotlin/issues/115) in your applications.
 
+### Changed
+
+* Improvements in the PDF navigator:
+  * The navigator doesn't require PDF publications to be served from an HTTP server anymore. A side effect is that the navigator is now able to open larger PDF files.
+  * `PdfNavigatorFragment.Listener::onResourceLoadFailed()` can be used to report fatal errors to the user, such as when trying to open a PDF document that is too large for the available memory.
+  * A dedicated `PdfNavigatorFragment.Factory` was added, which deprecates the use of `NavigatorFragmentFactory`.
 
 ## [2.0.0-alpha.1]
 
