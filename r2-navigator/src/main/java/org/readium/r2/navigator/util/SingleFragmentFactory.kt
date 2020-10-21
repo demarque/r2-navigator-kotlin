@@ -8,7 +8,6 @@ package org.readium.r2.navigator.util
 
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentFactory
-import java.lang.IllegalArgumentException
 
 /**
  * A simple [FragmentFactory] creating a single [Fragment] type.
@@ -21,11 +20,7 @@ abstract class SingleFragmentFactory<T : Fragment> : FragmentFactory() {
 
         return when (className) {
             fragmentClass.name -> fragment
-
-            else -> throw Fragment.InstantiationException(
-                "[${this::class.simpleName}] can only be used to instantiate a [${fragmentClass.simpleName}]",
-                IllegalArgumentException("Expected ${fragmentClass.simpleName} as the class name")
-            )
+            else -> super.instantiate(classLoader, className)
         }
     }
 
