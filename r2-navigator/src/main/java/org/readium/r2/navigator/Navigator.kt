@@ -49,7 +49,7 @@ interface Navigator {
      *
      * Reading apps can save the last read position by observing the [currentLocator].
      */
-    val currentLocator: StateFlow<Locator?>
+    val currentLocator: StateFlow<Locator>
 
     /**
      * Jumps to a [locator], for example from a position or annotation locator.
