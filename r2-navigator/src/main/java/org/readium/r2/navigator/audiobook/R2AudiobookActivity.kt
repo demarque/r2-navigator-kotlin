@@ -10,32 +10,35 @@ import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import kotlinx.android.synthetic.main.activity_r2_audiobook.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.readium.r2.navigator.BuildConfig.DEBUG
 import org.readium.r2.navigator.IR2Activity
 import org.readium.r2.navigator.NavigatorDelegate
 import org.readium.r2.navigator.R
 import org.readium.r2.navigator.VisualNavigator
 import org.readium.r2.navigator.extensions.withLocalUrl
-import org.readium.r2.shared.extensions.destroyPublication
 import org.readium.r2.shared.extensions.getPublication
 import org.readium.r2.shared.publication.*
+import org.readium.r2.shared.publication.services.isRestricted
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 
+@OptIn(ExperimentalCoroutinesApi::class)
 open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activity, MediaPlayerCallback, VisualNavigator {
 
-    override val currentLocator: LiveData<Locator?> get() = _currentLocator
-    private val _currentLocator = MutableLiveData<Locator?>(null)
+    override val currentLocator: StateFlow<Locator> get() = _currentLocator
+    private val _currentLocator = MutableStateFlow(Locator(href = "#", type = ""))
 
     private fun notifyCurrentLocation() {
         val locator = publication.readingOrder[currentResource].let { resource ->
             val progression = mediaPlayer
+                ?.takeIf { it.duration > 0 }
                 ?.let { it.currentPosition / it.duration }
                 ?: 0.0
 
@@ -53,15 +56,16 @@ open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activit
             )
         }
 
-        if (locator == currentLocator.value) {
+        if (locator == _currentLocator.value) {
             return
         }
 
-        _currentLocator.postValue(locator)
+        _currentLocator.value = locator
         navigatorDelegate?.locationDidChange(navigator = this, locator = locator)
     }
 
     override fun go(locator: Locator, animated: Boolean, completion: () -> Unit): Boolean {
+        loadedInitialLocator = true
         val resourceIndex = publication.readingOrder.indexOfFirstWithHref(locator.href) ?: return false
 
         val mediaPlayer = mediaPlayer ?: run {
@@ -127,6 +131,7 @@ open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activit
 
     var mediaPlayer: R2MediaPlayer? = null
     private var pendingLocator: Locator? = null
+    private var loadedInitialLocator = false
 
     protected var navigatorDelegate: NavigatorDelegate? = null
 
@@ -140,19 +145,23 @@ open class R2AudiobookActivity : AppCompatActivity(), CoroutineScope, IR2Activit
         publicationFileName = intent.getStringExtra("publicationFileName") ?: throw Exception("publicationFileName required")
 
         publication = intent.getPublication(this)
-        publicationIdentifier = publication.metadata.identifier!!
+        publicationIdentifier = publication.metadata.identifier ?: publication.metadata.title
+
+        require(!publication.isRestricted) { "The provided publication is restricted. Check that any DRM was properly unlocked using a Content Protection." }
 
         title = null
+
+        val port = preferences.getString("$publicationIdentifier-publicationPort", 0.toString())!!.toInt()
+        val readingOrderOverHttp = publication.readingOrder.map { it.withLocalUrl(publicationFileName, port) }
+        mediaPlayer = R2MediaPlayer(readingOrderOverHttp, this)
 
         Handler().postDelayed({
             
         if (this.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
 
-            val port = preferences.getString("$publicationIdentifier-publicationPort", 0.toString())!!.toInt()
-            val readingOrderOverHttp = publication.readingOrder.map { it.withLocalUrl(publicationFileName, port) }
-            mediaPlayer = R2MediaPlayer(readingOrderOverHttp, this)
-
-            go(pendingLocator ?: publication.readingOrder.first().toLocator())
+            if (!loadedInitialLocator) {
+                go(publication.readingOrder.first().toLocator())
+            }
 
             seekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 /**

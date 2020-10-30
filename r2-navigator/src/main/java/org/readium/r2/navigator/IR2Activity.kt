@@ -10,14 +10,9 @@
 package org.readium.r2.navigator
 
 import android.content.SharedPreferences
-import android.graphics.PointF
 import android.view.View
-import androidx.lifecycle.LiveData
 import org.readium.r2.navigator.pager.R2ViewPager
-import org.readium.r2.shared.publication.Link
-import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
-import org.readium.r2.shared.publication.ReadingProgression
 
 interface IR2Activity {
 

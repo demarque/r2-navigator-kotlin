@@ -10,6 +10,7 @@
 package org.readium.r2.navigator
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.*
@@ -26,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.BuildConfig.DEBUG
+import org.readium.r2.shared.SCROLL_REF
 import timber.log.Timber
 import kotlin.math.*
 
@@ -75,7 +77,7 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
 
 
     private fun getContentWidth(): Int {
-        return this.computeHorizontalScrollRange()//working after load of page
+        return this.computeHorizontalScrollExtent() * numPages
     }
 
     override fun getContentHeight(): Int {
@@ -282,7 +284,7 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
      * misaligned.
      */
     private fun getClientWidth(): Int {
-        return this.computeHorizontalScrollRange() / numPages
+        return this.computeHorizontalScrollExtent()
     }
 
     /**
@@ -703,18 +705,35 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
                 val currentPage = scrollX / getClientWidth()
                 val activePointerIndex = ev.findPointerIndex(mActivePointerId)
                 val x = ev.getX(activePointerIndex)
+                val y = ev.getY(activePointerIndex)
                 val totalDelta = (x - mInitialMotionX).toInt()
+                val totalDeltaY = (y - mInitialMotionY).toInt()
                 val nextPage = determineTargetPage(currentPage, 0f, initialVelocity, totalDelta)
-
-                if (nextPage == currentPage && nextPage == 0 && scrollX == 0) {
-                    if (DEBUG) Timber.tag(this::class.java.simpleName).d("onTouchEvent scrollLeft")
-                    scrollLeft(animated = true)
-                } else if (nextPage == numPages) {
-                    if (DEBUG) Timber.tag(this::class.java.simpleName).d("onTouchEvent scrollRight")
-                    scrollRight(animated = true)
+                
+                val scrollMode = preferences?.getBoolean(SCROLL_REF, false) ?: false
+                if (scrollMode) {
+                    if (abs(totalDeltaY) < 200) {
+                        if (mInitialMotionX < x) {
+                            // Log.d(TAG, "Left to Right swipe performed");
+                            if (DEBUG) Timber.tag(this::class.java.simpleName).d("onTouchEvent scrollLeft")
+                            scrollLeft(animated = true)
+                        } else if (mInitialMotionX > x) {
+                            // Log.d(TAG, "Right to Left swipe performed");
+                            if (DEBUG) Timber.tag(this::class.java.simpleName).d("onTouchEvent scrollRight")
+                            scrollRight(animated = true)
+                        }
+                    }
                 } else {
-                    if (DEBUG) Timber.tag(this::class.java.simpleName).d("onTouchEvent setCurrentItemInternal")
-                    setCurrentItemInternal(nextPage, true, initialVelocity)
+                    if (nextPage == currentPage && nextPage == 0 && scrollX == 0) {
+                        if (DEBUG) Timber.tag(this::class.java.simpleName).d("onTouchEvent scrollLeft")
+                        scrollLeft(animated = true)
+                    } else if (nextPage == numPages) {
+                        if (DEBUG) Timber.tag(this::class.java.simpleName).d("onTouchEvent scrollRight")
+                        scrollRight(animated = true)
+                    } else {
+                        if (DEBUG) Timber.tag(this::class.java.simpleName).d("onTouchEvent setCurrentItemInternal")
+                        setCurrentItemInternal(nextPage, true, initialVelocity)
+                    }
                 }
             }
 

@@ -7,8 +7,8 @@
 package org.readium.r2.navigator
 
 import android.graphics.PointF
-import androidx.lifecycle.LiveData
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import org.readium.r2.navigator.media.MediaPlayback
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
@@ -49,7 +49,7 @@ interface Navigator {
      *
      * Reading apps can save the last read position by observing the [currentLocator].
      */
-    val currentLocator: LiveData<Locator?>
+    val currentLocator: StateFlow<Locator?>
 
     /**
      * Jumps to a [locator], for example from a position or annotation locator.

@@ -6,20 +6,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## Changed
+
+* Upgraded to Kotlin 1.4.10.
+
+
+## [2.0.0-alpha.2]
+
 ### Added
 
+* Support for the new `Publication` model using the [Content Protection](https://readium.org/architecture/proposals/006-content-protection) for DRM rights and the [Fetcher](https://readium.org/architecture/proposals/002-composite-fetcher-api) for resource access.
 * (*Experimental*) New `Fragment` implementations as an alternative to the legacy `Activity` ones (contributed by [@johanpoirier](https://github.com/readium/r2-navigator-kotlin/pull/148)).
   * The fragments are chromeless, to let you customize the reading UX.
-  * To create the fragments use the matching factory such as `EpubNavigatorFragment.Factory`, as showcased in `R2EpubActivity`.
+  * To create the fragments use the matching factory such as `EpubNavigatorFragment.createFactory()`, as showcased in `R2EpubActivity`.
   * At the moment, highlights and TTS are not yet supported in the new EPUB navigator `Fragment`.
   * [This is now the recommended way to integrate Readium](https://github.com/readium/r2-navigator-kotlin/issues/115) in your applications.
 
 ### Changed
 
-* Improvements in the PDF navigator:
+* `currentLocator` is now a `StateFlow` instead of `LiveData`, to better support chromeless navigators such as an audiobook navigator.
+  * If you were observing `currentLocator` in a UI context, you can continue to do so with `currentLocator.asLiveData()`.
+* Improvements to the PDF navigator:
   * The navigator doesn't require PDF publications to be served from an HTTP server anymore. A side effect is that the navigator is now able to open larger PDF files.
   * `PdfNavigatorFragment.Listener::onResourceLoadFailed()` can be used to report fatal errors to the user, such as when trying to open a PDF document that is too large for the available memory.
-  * A dedicated `PdfNavigatorFragment.Factory` was added, which deprecates the use of `NavigatorFragmentFactory`.
+  * A dedicated `PdfNavigatorFragment.createFactory()` was added, which deprecates the use of `NavigatorFragmentFactory`.
+
+### Fixed
+
+* Prevent switching to the next resource by mistake when scrolling through an EPUB resource in scroll mode.
+
 
 ## [2.0.0-alpha.1]
 
@@ -51,3 +66,5 @@ All notable changes to this project will be documented in this file.
 
 [unreleased]: https://github.com/readium/r2-navigator-kotlin/compare/master...HEAD
 [2.0.0-alpha.1]: https://github.com/readium/r2-navigator-kotlin/compare/1.1.6...2.0.0-alpha.1
+[2.0.0-alpha.2]: https://github.com/readium/r2-navigator-kotlin/compare/2.0.0-alpha.1...2.0.0-alpha.2
+

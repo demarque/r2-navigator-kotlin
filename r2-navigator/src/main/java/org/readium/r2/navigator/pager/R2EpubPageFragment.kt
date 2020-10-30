@@ -63,6 +63,7 @@ class R2EpubPageFragment : Fragment() {
 
         webView.navigator = navigatorFragment
         webView.listener = navigatorFragment
+        webView.preferences = preferences
 
         webView.setScrollMode(scrollMode)
         webView.settings.javaScriptEnabled = true
@@ -88,7 +89,7 @@ class R2EpubPageFragment : Fragment() {
                 val topDecile = webView.contentHeight - 1.15 * metrics.heightPixels
                 val bottomDecile = (webView.contentHeight - metrics.heightPixels).toDouble()
 
-                when (scrollY) {
+                when (scrollY.toDouble()) {
                     in topDecile..bottomDecile -> {
                         if (!endReached) {
                             endReached = true

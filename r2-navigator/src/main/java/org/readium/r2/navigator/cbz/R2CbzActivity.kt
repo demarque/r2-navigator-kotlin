@@ -16,17 +16,24 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
+import androidx.lifecycle.asLiveData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import org.readium.r2.navigator.*
+import org.readium.r2.navigator.IR2Activity
+import org.readium.r2.navigator.NavigatorDelegate
+import org.readium.r2.navigator.R
+import org.readium.r2.navigator.VisualNavigator
 import org.readium.r2.navigator.image.ImageNavigatorFragment
 import org.readium.r2.navigator.pager.R2PagerAdapter
 import org.readium.r2.navigator.pager.R2ViewPager
 import org.readium.r2.shared.extensions.getPublication
-import org.readium.r2.shared.publication.*
+import org.readium.r2.shared.publication.Link
+import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.ReadingProgression
 import kotlin.coroutines.CoroutineContext
 
 open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, VisualNavigator, ImageNavigatorFragment.Listener {
@@ -40,7 +47,7 @@ open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, Vis
     protected val positions: List<Locator> get() = navigatorFragment.positions
     val currentPagerPosition: Int get() = navigatorFragment.currentPagerPosition
 
-    override val currentLocator: LiveData<Locator?>
+    override val currentLocator: StateFlow<Locator>
         get() = navigatorFragment.currentLocator
 
     override fun go(locator: Locator, animated: Boolean, completion: () -> Unit): Boolean {
@@ -88,7 +95,7 @@ open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, Vis
         publicationFileName = intent.getStringExtra("publicationFileName") ?: throw Exception("publicationFileName required")
         publication = intent.getPublication(this)
 
-        publicationIdentifier = publication.metadata.identifier!!
+        publicationIdentifier = publication.metadata.identifier ?: publication.metadata.title
         title = publication.metadata.title
 
         val initialLocator = intent.getParcelableExtra("locator") as? Locator
@@ -101,7 +108,7 @@ open class R2CbzActivity : AppCompatActivity(), CoroutineScope, IR2Activity, Vis
 
         resourcePager = navigatorFragment.resourcePager
 
-        navigatorFragment.currentLocator.observe(this, Observer { locator ->
+        navigatorFragment.currentLocator.asLiveData().observe(this, Observer { locator ->
             locator ?: return@Observer
             @Suppress("DEPRECATION")
             navigatorDelegate?.locationDidChange(this, locator)
