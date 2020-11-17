@@ -2,13 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-**Warning:** Features marked as *experimental* may change or be removed in a future release without notice. Use with caution.
+**Warning:** Features marked as *experimental* may change or be removed in a future release without notice. Use with
+caution.
 
 ## [Unreleased]
 
-## Changed
+### Changed
 
 * Upgraded to Kotlin 1.4.10.
+
+### Fixed
+
+* EPUBs declaring multiple languages were laid out from right to left if the first language had an RTL reading
+progression. Now if no reading progression is set, the `effectiveReadingProgression` will be LTR.
+* [#152](https://github.com/readium/r2-navigator-kotlin/issues/152) Panning through a zoomed-in fixed layout EPUB (contributed by [@johanpoirier](https://github.com/readium/r2-navigator-kotlin/pull/172)).
 
 
 ## [2.0.0-alpha.2]
