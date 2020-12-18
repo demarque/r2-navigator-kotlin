@@ -299,8 +299,9 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
     }
 
     internal fun updateCurrentItem() {
-        if (!scrollMode && !mIsBeingDragged) {
-            mCurItem = scrollX / computeHorizontalScrollExtent()
+        val clientWidth = getClientWidth()
+        if (!scrollMode && !mIsBeingDragged && clientWidth > 0) {
+            mCurItem = scrollX / clientWidth
         }
     }
 
@@ -397,7 +398,7 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
         setScrollingCacheEnabled(true)
         setScrollState(SCROLL_STATE_SETTLING)
 
-        val width = getClientWidth()
+        val width = getClientWidth().coerceAtLeast(1)
         val halfWidth = width / 2
         val distanceRatio = min(1f, 1.0f * abs(dx) / width)
         val distance = halfWidth + halfWidth * distanceInfluenceForSnapDuration(distanceRatio)
@@ -424,7 +425,7 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
 
         val ii = ItemInfo()
         ii.position = position
-        ii.offset = (position * (1 / numPages)).toFloat()
+        ii.offset = (position * (1 / numPages.coerceAtLeast(1))).toFloat()
 
         return ii
     }
@@ -441,7 +442,7 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
     private fun recomputeScrollPosition(width: Int, oldWidth: Int, margin: Int, oldMargin: Int) {
         if (oldWidth > 0 /*&& !mItems.isEmpty()*/) {
             if (!mScroller!!.isFinished) {
-                val currentPage = (scrollX / getClientWidth().toDouble()).roundToInt()
+                val currentPage = (scrollX / getClientWidth().toDouble().coerceAtLeast(1.0)).roundToInt()
 
                 mScroller!!.finalX = (currentPage * getClientWidth())
             } else {
@@ -559,7 +560,7 @@ class R2WebView(context: Context, attrs: AttributeSet) : R2BasicWebView(context,
 
     private fun pageScrolled(xpos: Int): Boolean {
         val ii = infoForCurrentScrollPosition()
-        val width = getClientWidth()
+        val width = getClientWidth().coerceAtLeast(1)
         val widthWithMargin = width + mPageMargin
         val marginOffset = mPageMargin.toFloat() / width
         val currentPage = ii!!.position
