@@ -25,6 +25,7 @@ import org.readium.r2.navigator.R2BasicWebView
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.fxl.R2FXLLayout
 import org.readium.r2.navigator.epub.fxl.R2FXLOnDoubleTapListener
+import org.readium.r2.shared.publication.services.isProtected
 
 class R2FXLPageFragment : Fragment() {
 
@@ -121,10 +122,15 @@ class R2FXLPageFragment : Fragment() {
             }
 
         }
-        webView.isHapticFeedbackEnabled = false
-        webView.isLongClickable = false
-        webView.setOnLongClickListener {
-            true
+
+        // Disable the text selection if the publication is protected.
+        // FIXME: This is a hack until proper LCP copy is implemented, see https://github.com/readium/r2-testapp-kotlin/issues/266
+        if (navigatorFragment.publication.isProtected) {
+            webView.isHapticFeedbackEnabled = false
+            webView.isLongClickable = false
+            webView.setOnLongClickListener {
+                true
+            }
         }
 
         resourceUrl?.let { webView.loadUrl(it) }
