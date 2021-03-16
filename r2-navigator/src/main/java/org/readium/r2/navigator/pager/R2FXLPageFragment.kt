@@ -20,12 +20,11 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.fragment.app.Fragment
 import androidx.webkit.WebViewClientCompat
+import org.readium.r2.navigator.Navigator
 import org.readium.r2.navigator.R
 import org.readium.r2.navigator.R2BasicWebView
-import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.fxl.R2FXLLayout
 import org.readium.r2.navigator.epub.fxl.R2FXLOnDoubleTapListener
-import org.readium.r2.shared.publication.services.isProtected
 
 class R2FXLPageFragment : Fragment() {
 
@@ -34,6 +33,8 @@ class R2FXLPageFragment : Fragment() {
 
     private val secondResourceUrl: String?
         get() = requireArguments().getString("secondUrl")
+
+    private var webViews = mutableListOf<WebView>()
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -81,12 +82,23 @@ class R2FXLPageFragment : Fragment() {
         }
     }
 
+    override fun onDetach() {
+        super.onDetach()
+
+        // Prevent the web views from leaking when their parent is detached.
+        // See https://stackoverflow.com/a/19391512/1474476
+        for (wv in webViews) {
+            (wv.parent as? ViewGroup)?.removeView(wv)
+            wv.removeAllViews()
+            wv.destroy()
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView(webView: R2BasicWebView, resourceUrl: String?) {
-        val navigatorFragment = parentFragmentManager.findFragmentByTag(getString(R.string.epub_navigator_tag)) as EpubNavigatorFragment
-
-        webView.navigator = navigatorFragment
-        webView.listener = navigatorFragment
+        webViews.add(webView)
+        webView.navigator = parentFragment as Navigator
+        webView.listener = parentFragment as R2BasicWebView.Listener
 
         webView.settings.javaScriptEnabled = true
         webView.isVerticalScrollBarEnabled = false
@@ -104,11 +116,9 @@ class R2FXLPageFragment : Fragment() {
 
 
         webView.webViewClient = object : WebViewClientCompat() {
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                if (!request.hasGesture()) return false
-                view.loadUrl(request.url.toString())
-                return false
-            }
+
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+                (webView as? R2BasicWebView)?.shouldOverrideUrlLoading(request) ?: false
 
             // prevent favicon.ico to be loaded, this was causing NullPointerException in NanoHttp
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
@@ -121,16 +131,6 @@ class R2FXLPageFragment : Fragment() {
                 return null
             }
 
-        }
-
-        // Disable the text selection if the publication is protected.
-        // FIXME: This is a hack until proper LCP copy is implemented, see https://github.com/readium/r2-testapp-kotlin/issues/266
-        if (navigatorFragment.publication.isProtected) {
-            webView.isHapticFeedbackEnabled = false
-            webView.isLongClickable = false
-            webView.setOnLongClickListener {
-                true
-            }
         }
 
         resourceUrl?.let { webView.loadUrl(it) }

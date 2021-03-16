@@ -26,6 +26,7 @@ import org.readium.r2.navigator.R2BasicWebView
 import org.readium.r2.navigator.VisualNavigator
 import org.readium.r2.navigator.extensions.htmlId
 import org.readium.r2.navigator.extensions.positionsByResource
+import org.readium.r2.navigator.extensions.withBaseUrl
 import org.readium.r2.navigator.pager.R2EpubPageFragment
 import org.readium.r2.navigator.pager.R2PagerAdapter
 import org.readium.r2.navigator.pager.R2ViewPager
@@ -90,8 +91,6 @@ class EpubNavigatorFragment private constructor(
         positions = runBlocking { publication.positions() }
         publicationIdentifier = publication.metadata.identifier ?: publication.metadata.title
 
-        val supportFragmentManager = currentActivity.supportFragmentManager
-
         // TODO needs work, currently showing two resources for fxl, needs to understand which two resources, left & right, or only right etc.
         var doublePageIndex = 0
         var doublePageLeft = ""
@@ -99,7 +98,7 @@ class EpubNavigatorFragment private constructor(
         var resourceIndexDouble = 0
 
         for ((resourceIndexSingle, spineItem) in publication.readingOrder.withIndex()) {
-            val uri: String = baseUrl + spineItem.href
+            val uri: String = spineItem.withBaseUrl(baseUrl).href
             resourcesSingle.add(Pair(resourceIndexSingle, uri))
 
             // add first page to the right,
@@ -127,23 +126,22 @@ class EpubNavigatorFragment private constructor(
             resourcesDouble.add(Triple(resourceIndexDouble, doublePageLeft, ""))
         }
 
-
         if (publication.metadata.presentation.layout == EpubLayout.REFLOWABLE) {
-            adapter = R2PagerAdapter(supportFragmentManager, resourcesSingle, publication.metadata.title, Publication.TYPE.EPUB)
+            adapter = R2PagerAdapter(childFragmentManager, resourcesSingle, publication.metadata.title, Publication.TYPE.EPUB)
             resourcePager.type = Publication.TYPE.EPUB
         } else {
             resourcePager.type = Publication.TYPE.FXL
             adapter = when (preferences.getInt(COLUMN_COUNT_REF, 0)) {
                 1 -> {
-                    R2PagerAdapter(supportFragmentManager, resourcesSingle, publication.metadata.title, Publication.TYPE.FXL)
+                    R2PagerAdapter(childFragmentManager, resourcesSingle, publication.metadata.title, Publication.TYPE.FXL)
                 }
                 2 -> {
-                    R2PagerAdapter(supportFragmentManager, resourcesDouble, publication.metadata.title, Publication.TYPE.FXL)
+                    R2PagerAdapter(childFragmentManager, resourcesDouble, publication.metadata.title, Publication.TYPE.FXL)
                 }
                 else -> {
                     // TODO based on device
                     // TODO decide if 1 page or 2 page
-                    R2PagerAdapter(supportFragmentManager, resourcesSingle, publication.metadata.title, Publication.TYPE.FXL)
+                    R2PagerAdapter(childFragmentManager, resourcesSingle, publication.metadata.title, Publication.TYPE.FXL)
                 }
             }
         }
@@ -309,7 +307,7 @@ class EpubNavigatorFragment private constructor(
     }
 
     override fun onTap(point: PointF): Boolean {
-        return (this.listener as VisualNavigator.Listener).onTap(point)
+        return this.listener?.onTap(point) ?: false
     }
 
     override fun onProgressionChanged() {
