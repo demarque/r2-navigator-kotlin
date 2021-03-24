@@ -26,28 +26,25 @@ import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
 import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.google.android.exoplayer2.upstream.DataSource
-import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory
 import com.google.android.exoplayer2.upstream.HttpDataSource
 import com.google.android.exoplayer2.upstream.cache.Cache
 import com.google.android.exoplayer2.upstream.cache.CacheDataSource
 import com.google.android.exoplayer2.upstream.cache.NoOpCacheEvictor
 import com.google.android.exoplayer2.upstream.cache.SimpleCache
-import com.google.android.exoplayer2.util.Util
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.R
-import org.readium.r2.navigator.audio.CompositeDataSource
 import org.readium.r2.navigator.audio.PublicationDataSource
 import org.readium.r2.navigator.extensions.timeWithDuration
 import org.readium.r2.shared.AudioSupport
+import org.readium.r2.shared.extensions.asInstance
 import org.readium.r2.shared.fetcher.Resource
 import org.readium.r2.shared.publication.*
 import timber.log.Timber
 import java.io.File
 import java.net.UnknownHostException
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
@@ -66,11 +63,7 @@ class ExoMediaPlayer(
     private val publicationId: PublicationId = media.publicationId
 
     private val dataSourceFactory by lazy {
-        var factory: DataSource.Factory = CompositeDataSource.Factory()
-            .bind(DefaultHttpDataSourceFactory(Util.getUserAgent(context, "Readium"))) {
-                it.scheme?.toLowerCase(Locale.ROOT) in listOf("http", "https")
-            }
-            .bind(PublicationDataSource.Factory(publication))
+        var factory: DataSource.Factory = PublicationDataSource.Factory(publication)
 
         if (cache != null) {
             factory = CacheDataSource.Factory()
@@ -176,11 +169,9 @@ class ExoMediaPlayer(
         }
 
         override fun onPlayerError(error: ExoPlaybackException) {
-            Timber.e(error)
-
-            val resourceException: Resource.Exception? = when {
-                (error.cause as? HttpDataSource.HttpDataSourceException)?.cause is UnknownHostException -> Resource.Exception.Offline
-                else -> null
+            var resourceException: Resource.Exception? = error.asInstance<Resource.Exception>()
+            if (resourceException == null && (error.cause as? HttpDataSource.HttpDataSourceException)?.cause is UnknownHostException) {
+                resourceException = Resource.Exception.Offline
             }
 
             if (resourceException != null) {
@@ -189,6 +180,8 @@ class ExoMediaPlayer(
                     ?.let { link ->
                         listener?.onResourceLoadFailed(link, resourceException)
                     }
+            } else {
+                Timber.e(error)
             }
         }
 
